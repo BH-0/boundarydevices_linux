@@ -523,13 +523,13 @@
                 wakeup-gpios = <&pcal6534 16 GPIO_ACTIVE_LOW>;
                 status = "okay";
         };
-#endif
 	dsi0_sn65dsi84: dsi0@2c {
                 compatible = "ti,sn65dsi84";
                 enable-gpios = <&pcal6534 17 GPIO_ACTIVE_HIGH>;
                 reg = <0x2c>;
                 status = "okay";
         };
+#endif
 
 };
 
@@ -799,7 +799,7 @@
                 panel-width-mm = <217>;
                 power-supply = <&reg_vref_5v0>;
                 reg = <0>;
-                sn65dsi83 = <&dsi0_sn65dsi84>;
+//                sn65dsi83 = <&dsi0_sn65dsi84>;
                 spwg;
 
                 display-timings {
