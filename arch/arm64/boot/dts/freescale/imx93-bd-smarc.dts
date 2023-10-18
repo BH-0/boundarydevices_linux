@@ -225,6 +225,13 @@
 		mode-video-hsa-disable;
 	};
 
+	mipi_cmds_m101nwwb: mipi-cmds-m101nwwb {
+                alias = <&mipi_cmds_m101nwwb>;
+                mode-video-hbp-disable;
+                mode-video-hfp-disable;
+                mode-video-hsa-disable;
+        };
+
 };
 
 &adc1 {
@@ -790,19 +797,26 @@
                 dsi-lanes = <4>;
 
 		/* This tends to be done by Boundarys U-boot */
-		mipi-cmds = <&mipi_cmds_ltk080a60a004t>;
+//		mipi-cmds = <&mipi_cmds_ltk080a60a004t>;
+		mipi-cmds = <&mipi_cmds_m101nwwb>;
 
                 mode-skip-eot;
                 mode-video;
                 mode-video-burst;
                 panel-height-mm = <136>;
                 panel-width-mm = <217>;
+
+		/* used by mipi_to_lvds node ?? !!! */
+//		pinctrl-names = "sn65dsi83";
+//		pinctrl-0 = <&pinctrl_i2cmuxlcdc_sn65dsi83>;
+
                 power-supply = <&reg_vref_5v0>;
                 reg = <0>;
-//                sn65dsi83 = <&dsi0_sn65dsi84>;
+                sn65dsi83 = <&mipi_to_lvds>;
                 spwg;
 
                 display-timings {
+#if 0
 			t_mipi: t-dsi-default {
 				/* ltk080a60a004t */
 				clock-frequency = <120000000>;
@@ -817,7 +831,8 @@
                                 hsync-active = <0>;
                                 vsync-active = <0>;
 			};
-#if 0
+#endif
+#if 1
                         t_mipi: t-dsi-default {
                                 /* m101nwwb by default */
                                 clock-frequency = <66000000>;
@@ -835,6 +850,15 @@
                         };
 #endif
         	};
+
+		mipi_to_lvds: mipi-to-lvds {
+                        alias = <&mipi_to_lvds>;
+                        enable-gpios = <&pcal6534 17 GPIO_ACTIVE_HIGH>;
+                        i2c-address = <0x2c>;
+                        i2c-bus = <&i2cmuxlcdc>;
+                        interrupts-extended = <&pcal6534 18 IRQ_TYPE_EDGE_RISING>;
+                        status = "okay";
+                };
 
 		port {
                         panel_in: endpoint {
