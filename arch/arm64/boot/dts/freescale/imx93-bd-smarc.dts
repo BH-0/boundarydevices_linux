@@ -239,8 +239,6 @@
 	status = "okay";
 };
 
-#if 0
-// Doesn't work in Linux yet
 &eqos {
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_eqos>;
@@ -258,12 +256,15 @@
                         reg = <3>;
                         eee-broken-1000t;
                         at803x,hib-disabled;
-                        interrupts-extended = <&gpio2 29 GPIO_ACTIVE_LOW>;
+			interrupt-parent = <&gpio2>;
+			interrupts = <29 IRQ_TYPE_LEVEL_LOW>;
+			interrupt-names = "eth_lpi";
+#if 0
                         reset-gpios =<&pcal6534 1 GPIO_ACTIVE_LOW>;
+#endif
                 };
 	};
 };
-#endif
 
 &fec {
         pinctrl-names = "default";
@@ -280,9 +281,11 @@
                 ethphy2: ethernet-phy@2 {
                         compatible = "ethernet-phy-ieee802.3-c22";
                         eee-broken-1000t;
+#if 0
                         reset-gpios = <&pcal6534 0 GPIO_ACTIVE_LOW>;
                         reset-assert-us = <10000>;
                         reset-deassert-us = <150000>;
+#endif
                         interrupts-extended = <&gpio2 16 IRQ_TYPE_LEVEL_LOW>;
                         reg = <3>;
                 };
