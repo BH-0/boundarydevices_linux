@@ -6,7 +6,16 @@
 /dts-v1/;
 
 #include <dt-bindings/usb/pd.h>
+#include <dt-bindings/leds/common.h>
 #include "imx93.dtsi"
+
+#define DSI 8 // 10 = sn65, 8 = no sn65
+// #define LVDS
+
+#if defined(DSI) && defined(LVDS)
+#error Only DSI OR LVDS may be defined
+#endif
+
 
 &ele_mu {
 	memory-region = <&ele_reserved>;
@@ -20,14 +29,10 @@
 		stdout-path = &lpuart1;
 	};
 
-#if 0
-	/* Our board swaps the ports */
         aliases {
-                eth0 = &eqos;
-                eth1 = &fec;
 		rtc0 = &rv3028;
+		rtc1 = &bbnsm_rtc;
         };
-#endif
 
 	reserved-memory {
 		#address-cells = <2>;
@@ -107,7 +112,29 @@
 	};
 #endif
 
-	backlight_0: backlight-0 {
+#if 0
+	led-controller {
+		compatible = "pwm-leds";
+
+		led-1 {
+			label = "sai1-mclk";
+			pwms = <&tpm1 2 30000 0>;
+			max-brightness = <10>;
+		};
+
+	};
+#endif
+
+	sai1_pwm_mclk: sai1-mclk {
+                compatible = "pwm-clock";
+                #clock-cells = <0>;
+                clock-frequency = <25000000>;
+                clock-output-names = "sai1_pwm_mclk";
+                pwms = <&tpm1 2 40 0>; /* 1 / 40 ns = 25 MHz */
+        };
+
+#ifdef DSI
+	dsi_backlight: dsi-backlight {
                 brightness-levels = <0 1 2 3 4 5 6 7 8 9 10>;
                 compatible = "pwm-backlight";
                 default-brightness-level = <8>;
@@ -117,7 +144,33 @@
                 pwms = <&tpm5 3 30000 0>;       /* 33.3 Khz */
                 status = "okay";
         };
+#endif
 
+#ifdef LVDS
+	lvds_backlight: lvds_backlight {
+		brightness-levels = <0 1 2 3 4 5 6 7 8 9 10>;
+                compatible = "pwm-backlight";
+                default-brightness-level = <8>;
+                display = <&lcdif>;
+                pinctrl-names = "default";
+                pinctrl-0 = <&pinctrl_backlight_1>;
+                pwms = <&tpm6 1 30000 0>;       /* 33.3 Khz */
+                status = "okay";
+        };
+
+#if 1
+	lvds_panel {
+                compatible = "tianma,tm070jdhg30";
+                backlight = <&lvds_backlight>;
+
+                port {
+                        panel_lvds_in: endpoint {
+                                remote-endpoint = <&lvds_out>;
+                        };
+                };
+        };
+#endif
+#endif
 
 	reg_usdhc2_vmmc: regulator-usdhc2 {
 		compatible = "regulator-fixed";
@@ -256,9 +309,10 @@
                         reg = <3>;
                         eee-broken-1000t;
                         at803x,hib-disabled;
+//			interrupts-extended = <&gpio2 29 GPIO_ACTIVE_LOW>;
 			interrupt-parent = <&gpio2>;
 			interrupts = <29 IRQ_TYPE_LEVEL_LOW>;
-			interrupt-names = "eth_lpi";
+//			interrupt-names = "eth_lpi";
 #if 0
                         reset-gpios =<&pcal6534 1 GPIO_ACTIVE_LOW>;
 #endif
@@ -307,6 +361,21 @@
         pinctrl-1 = <&pinctrl_lpi2c1>;
         status = "okay";
 
+#ifdef LVDS
+	ts_goodix: touchscreen@5d {
+                compatible = "goodix,gt9271";
+                esd-recovery-timeout-ms = <2000>;
+		interrupts-extended = <&pcal6534 23 IRQ_TYPE_EDGE_RISING>;
+		interrupt-parent = <&pcal6534>;
+                interrupts = <23 IRQ_TYPE_EDGE_RISING>; // P2_7
+                irq-gpios = <&pcal6534 23 GPIO_ACTIVE_HIGH>;
+                //pinctrl-names = "default";
+                //pinctrl-0 = <&pinctrl_ts_lvds_gt911>;
+                reg = <0x5d>;
+                //reset-gpios = <&gpio2 3 GPIO_ACTIVE_HIGH>;
+                status = "okay";
+        };
+#endif
 };
 
 &lpi2c2 {
@@ -504,7 +573,7 @@
 };
 
 &i2cmuxlcdc {
-#if 1
+#ifdef DSI
 	/* 0x5d or 0x14 */
 	ts_goodix: touchscreen@14 {
                 compatible = "goodix,gt9271";
@@ -514,7 +583,7 @@
                 interrupts = <16 IRQ_TYPE_EDGE_RISING>;
                 irq-gpios = <&pcal6534 16 GPIO_ACTIVE_HIGH>;
                 pinctrl-names = "default";
-                pinctrl-0 = <&pinctrl_ts_gt911>;
+                pinctrl-0 = <&pinctrl_ts_dsi_gt911>;
                 reg = <0x14>;
                 reset-gpios = <&gpio2 3 GPIO_ACTIVE_HIGH>;
                 status = "okay";
@@ -527,12 +596,13 @@
 		interrupt-parent = <&pcal6534>;
                 interrupts = <16 IRQ_TYPE_EDGE_FALLING>;
                 pinctrl-names = "default";
-                pinctrl-0 = <&pinctrl_ts_gt911>;
+                pinctrl-0 = <&pinctrl_ts_dsi_gt911>;
                 reg = <0x38>;
                 reset-gpios = <&gpio2 3 GPIO_ACTIVE_LOW>;
                 wakeup-gpios = <&pcal6534 16 GPIO_ACTIVE_LOW>;
                 status = "okay";
         };
+
 	dsi0_sn65dsi84: dsi0@2c {
                 compatible = "ti,sn65dsi84";
                 enable-gpios = <&pcal6534 17 GPIO_ACTIVE_HIGH>;
@@ -670,7 +740,16 @@
         xceiver-supply = <&reg_can2_stby>;
 };
 
+&tpm1 {
+	/* Used for sai1_mclk */
+	status = "okay";
+};
+
 &tpm5 {
+	status = "okay";
+};
+
+&tpm6 {
 	status = "okay";
 };
 
@@ -696,6 +775,10 @@
         status = "okay";
 };
 
+&media_blk_ctrl {
+        status = "okay";
+};
+
 &mu1 {
 	status = "okay";
 };
@@ -710,9 +793,13 @@
 	pinctrl-0 = <&pinctrl_sai1>;
 	assigned-clocks = <&clk IMX93_CLK_SAI1>;
 	assigned-clock-parents = <&clk IMX93_CLK_AUDIO_PLL>;
+	clocks = <&clk IMX93_CLK_SAI1_IPG>, <&clk IMX93_CLK_DUMMY>,
+		<&clk IMX93_CLK_SAI1_GATE>, <&clk IMX93_CLK_DUMMY>,
+		<&sai1_pwm_mclk>;
+	clock-names = "bus", "mclk0", "mclk1", "mclk2", "mclk3";
 	/* wm8962 needs MCLK 14 - 40 MHz */
-	assigned-clock-rates = <24576000>;
-	/* CPU is master for Master, Bit and SYNC CLKs */
+	assigned-clock-rates = <25000000>;
+	/* CPU is master for MCLK, and slave for Bit and SYNC CLKs */
 	fsl,sai-mclk-direction-output;
 	fsl,sai-asynchronous;
 	status = "okay";
@@ -780,6 +867,7 @@
 };
 #endif
 
+#ifdef DSI
 &dphy {
         status = "okay";
 };
@@ -788,7 +876,7 @@
 	status = "okay";
 
         fb_mipi: panel@0 {
-                backlight = <&backlight_0>;
+                backlight = <&dsi_backlight>;
                 bits-per-color = <8>;
                 bridge-de-active = <0>;
                 bus-format = "rgb888";
@@ -800,8 +888,11 @@
                 dsi-lanes = <4>;
 
 		/* This tends to be done by Boundarys U-boot */
-//		mipi-cmds = <&mipi_cmds_ltk080a60a004t>;
+#if DSI == 10
 		mipi-cmds = <&mipi_cmds_m101nwwb>;
+#else
+		mipi-cmds = <&mipi_cmds_ltk080a60a004t>;
+#endif
 
                 mode-skip-eot;
                 mode-video;
@@ -809,34 +900,21 @@
                 panel-height-mm = <136>;
                 panel-width-mm = <217>;
 
-		/* used by mipi_to_lvds node ?? !!! */
+		/* used by dsi_to_lvds node ?? !!! */
 //		pinctrl-names = "sn65dsi83";
 //		pinctrl-0 = <&pinctrl_i2cmuxlcdc_sn65dsi83>;
 
                 power-supply = <&reg_vref_5v0>;
                 reg = <0>;
-                sn65dsi83 = <&mipi_to_lvds>;
                 spwg;
 
-                display-timings {
-#if 0
-			t_mipi: t-dsi-default {
-				/* ltk080a60a004t */
-				clock-frequency = <120000000>;
-				hactive = <1200>;
-				vactive = <1920>;
-				hback-porch = <60>;
-				vback-porch = <25>;
-				hfront-porch = <42>;
-				vfront-porch = <35>;
-				hsync-len = <2>;
-				vsync-len = <1>;
-                                hsync-active = <0>;
-                                vsync-active = <0>;
-			};
+#if DSI == 10
+                sn65dsi83 = <&dsi_to_lvds>;
 #endif
-#if 1
-                        t_mipi: t-dsi-default {
+
+                display-timings {
+#if DSI == 10
+                        t_dsi: t-dsi-default {
                                 /* m101nwwb by default */
                                 clock-frequency = <66000000>;
                                 hactive = <1280>;
@@ -851,17 +929,32 @@
                                 vsync-active = <0>;
                                 de-active = <1>;
                         };
+#else
+			t_dsi: t-dsi-default {
+				/* ltk080a60a004t */
+				clock-frequency = <120000000>;
+				hactive = <1200>;
+				vactive = <1920>;
+				hback-porch = <60>;
+				vback-porch = <25>;
+				hfront-porch = <42>;
+				vfront-porch = <35>;
+				hsync-len = <2>;
+				vsync-len = <1>;
+                                hsync-active = <0>;
+                                vsync-active = <0>;
+			};
 #endif
         	};
-
-		mipi_to_lvds: mipi-to-lvds {
-                        alias = <&mipi_to_lvds>;
+#if DSI == 10
+		dsi_to_lvds: dsi-to-lvds {
                         enable-gpios = <&pcal6534 17 GPIO_ACTIVE_HIGH>;
                         i2c-address = <0x2c>;
                         i2c-bus = <&i2cmuxlcdc>;
-                        interrupts-extended = <&pcal6534 18 IRQ_TYPE_EDGE_RISING>;
+                        interrupts-extended = <&pcal6534 18 (IRQ_TYPE_EDGE_RISING | GPIO_PULL_DOWN)>;
                         status = "okay";
                 };
+#endif
 
 		port {
                         panel_in: endpoint {
@@ -886,11 +979,73 @@
 	status = "okay";
 };
 
+#endif
+
+#ifdef LVDS
+&dphy {
+        status = "disabled";
+};
+
+&dsi {
+        status = "disabled";
+};
+
+&lcdif {
+	assigned-clock-rates = <438200000>, <62600000>, <400000000>, <133333333>;
+	status = "okay";
+};
+
+&ldb {
+	status = "okay";
+
+	lvds-channel@0 {
+		status = "okay";
+
+#if 0
+		display-timings {
+                        t_lvds: t_lvds_default {
+                                /* m101nwwb by default */
+                                clock-frequency = <74250000>;
+                                hactive = <1280>;
+                                vactive = <800>;
+                                hback-porch = <5>;
+                                hfront-porch = <123>;
+                                vback-porch = <3>;
+                                vfront-porch = <24>;
+                                hsync-len = <1>;
+                                vsync-len = <1>;
+                        };
+                };
+#endif
+
+		port@1 {
+			reg = <1>;
+
+			lvds_out: endpoint {
+                                remote-endpoint = <&panel_lvds_in>;
+                        };
+		};
+	};
+
+};
+
+&ldb_phy {
+	status = "okay";
+};
+
+#endif
+
 &iomuxc {
 
 	pinctrl_backlight_0: backlight_0 {
 		fsl,pins = <
 			MX93_PAD_GPIO_IO26__TPM5_CH3				0x02
+		>;
+	};
+
+	pinctrl_backlight_1: backlight_1 {
+		fsl,pins = <
+			MX93_PAD_GPIO_IO23__TPM6_CH1				0x02
 		>;
 	};
 
@@ -989,7 +1144,7 @@
 		>;
 	};
 
-	pinctrl_ts_gt911: tsgt911grp {
+	pinctrl_ts_dsi_gt911: tsdsigt911grp {
 		fsl,pins = <
 			MX93_PAD_GPIO_IO03__GPIO2_IO03			0x31e
 		>;
@@ -1067,7 +1222,9 @@
 		fsl,pins = <
 			MX93_PAD_SAI1_TXFS__SAI1_TX_SYNC		0x31e
 			MX93_PAD_SAI1_TXC__SAI1_TX_BCLK			0x31e
-			MX93_PAD_UART2_RXD__SAI1_MCLK			0x30e
+			/* MX93_PAD_GPIO_IO22__TPM5_CH1			0x02 */
+			/* MX93_PAD_UART2_RXD__SAI1_MCLK		0x30e */
+			MX93_PAD_UART2_RXD__TPM1_CH2			0x02
 			MX93_PAD_SAI1_TXD0__SAI1_TX_DATA00		0x31e
 			MX93_PAD_SAI1_RXD0__SAI1_RX_DATA00		0x31e
 		>;
