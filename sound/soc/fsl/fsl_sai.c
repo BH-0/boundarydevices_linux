@@ -226,7 +226,9 @@ static int fsl_sai_set_mclk_rate(struct snd_soc_dai *dai, int clk_id, unsigned i
 
 	ret = clk_set_rate(sai->mclk_clk[clk_id], freq);
 	if (ret < 0)
-		dev_err(dai->dev, "failed to set clock rate (%u): %d\n", freq, ret);
+		dev_err(dai->dev, "%s: failed to set clock rate (%u): %d\n", __func__, freq, ret);
+	else
+		dev_dbg(dai->dev, "%s: set mclk[%i] rate (%u)\n", __func__, clk_id, freq);
 
 	return ret;
 }
@@ -360,17 +362,21 @@ static int fsl_sai_set_dai_fmt_tr(struct snd_soc_dai *cpu_dai,
 		val_cr2 |= FSL_SAI_CR2_BCD_MSTR;
 		val_cr4 |= FSL_SAI_CR4_FSD_MSTR;
 		sai->is_consumer_mode[tx] = false;
+		dev_dbg(cpu_dai->dev, "%s: sai->is_consumer_mode[tx] false\n", __func__);
 		break;
 	case SND_SOC_DAIFMT_BC_FC:
 		sai->is_consumer_mode[tx] = true;
+		dev_dbg(cpu_dai->dev, "%s: sai->is_consumer_mode[tx] true\n", __func__);
 		break;
 	case SND_SOC_DAIFMT_BP_FC:
 		val_cr2 |= FSL_SAI_CR2_BCD_MSTR;
 		sai->is_consumer_mode[tx] = false;
+		dev_dbg(cpu_dai->dev, "%s: sai->is_consumer_mode[tx] false\n", __func__);
 		break;
 	case SND_SOC_DAIFMT_BC_FP:
 		val_cr4 |= FSL_SAI_CR4_FSD_MSTR;
 		sai->is_consumer_mode[tx] = true;
+		dev_dbg(cpu_dai->dev, "%s: sai->is_consumer_mode[tx] true\n", __func__);
 		break;
 	default:
 		return -EINVAL;
@@ -542,6 +548,7 @@ static int fsl_sai_hw_params(struct snd_pcm_substream *substream,
 	u32 val_cr4 = 0, val_cr5 = 0;
 	u32 slots = (channels == 1) ? 2 : channels;
 	u32 slot_width = word_width;
+	unsigned long mclk;
 	int adir = tx ? RX : TX;
 	u32 pins, bclk;
 	u32 watermark;
@@ -579,6 +586,7 @@ static int fsl_sai_hw_params(struct snd_pcm_substream *substream,
 	}
 
 	bclk = params_rate(params) * (sai->bclk_ratio ? sai->bclk_ratio : slots * slot_width);
+	dev_dbg(cpu_dai->dev, "%s: bclk wants to be set to %i\n", __func__, bclk);
 
 	if (!IS_ERR_OR_NULL(sai->pinctrl)) {
 		sai->pins_state = fsl_sai_get_pins_state(sai, bclk);
@@ -603,6 +611,29 @@ static int fsl_sai_hw_params(struct snd_pcm_substream *substream,
 				return ret;
 
 			sai->mclk_streams |= BIT(substream->stream);
+		}
+
+	} else if (sai->mclk_direction_output) {
+		// TODO SimonG Maybe just enable it ?
+		mclk = clk_get_rate(sai->mclk_clk[3]);
+
+		dev_dbg(cpu_dai->dev, "%s: (We're slave) but mclk_direction_output. Starting mclk[3]\n", __func__);
+
+		if (IS_ERR_OR_NULL(sai->mclk_clk[3])) {
+			dev_err(cpu_dai->dev, "Unassigned clock: 3\n");
+			return -EINVAL;
+		}
+		if (sai->mclk_streams == 0) {
+			// ret = fsl_sai_set_mclk_rate(cpu_dai, 3, mclk);
+			// if (ret < 0){
+			// 	dev_err(cpu_dai->dev, "%s: Error setting mclk rate\n",__func__);
+			// 	return ret;
+			// }
+			ret = clk_prepare_enable(sai->mclk_clk[3]);
+			if (ret){
+				dev_err(cpu_dai->dev, "%s: Error: clk_prepare_enable\n",__func__);
+				return ret;
+			}
 		}
 	}
 
@@ -715,6 +746,9 @@ static int fsl_sai_hw_free(struct snd_pcm_substream *substream,
 	if (!sai->is_consumer_mode[tx] &&
 			sai->mclk_streams & BIT(substream->stream)) {
 		clk_disable_unprepare(sai->mclk_clk[sai->mclk_id[tx]]);
+		if (sai->mclk_direction_output) {
+			clk_disable_unprepare(sai->mclk_clk[3]);
+		}
 		sai->mclk_streams &= ~BIT(substream->stream);
 	}
 
@@ -1719,6 +1753,10 @@ static int fsl_sai_runtime_suspend(struct device *dev)
 	if (sai->mclk_streams & BIT(SNDRV_PCM_STREAM_PLAYBACK))
 		clk_disable_unprepare(sai->mclk_clk[sai->mclk_id[1]]);
 
+	if (sai->mclk_streams & sai->mclk_direction_output) {
+		clk_disable_unprepare(sai->mclk_clk[3]);
+	}
+
 	clk_disable_unprepare(sai->bus_clk);
 
 	if (sai->soc_data->flags & PMQOS_CPU_LATENCY)
@@ -1753,6 +1791,12 @@ static int fsl_sai_runtime_resume(struct device *dev)
 			goto disable_tx_clk;
 	}
 
+	if (sai->mclk_streams & sai->mclk_direction_output) {
+		clk_prepare_enable(sai->mclk_clk[3]);
+		if (ret)
+			goto disable_mclk;
+	}
+
 	if (sai->soc_data->flags & PMQOS_CPU_LATENCY)
 		cpu_latency_qos_add_request(&sai->pm_qos_req, 0);
 
@@ -1783,6 +1827,10 @@ disable_tx_clk:
 		clk_disable_unprepare(sai->mclk_clk[sai->mclk_id[1]]);
 disable_bus_clk:
 	clk_disable_unprepare(sai->bus_clk);
+disable_mclk:
+	if (sai->mclk_streams & sai->mclk_direction_output) {
+                clk_disable_unprepare(sai->mclk_clk[3]);
+        }
 
 	return ret;
 }
