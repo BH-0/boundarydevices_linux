@@ -708,11 +708,18 @@
         };
 };
 
-&lpuart1 { /* console */
+&lpuart1 { /* console SER1 */
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_uart1>;
 	status = "okay";
 };
+
+&lpuart2 { /* M33 console SER3 */
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_uart2>;
+	status = "okay";
+};
+
 
 #if 0
 &lpuart5 {
@@ -727,6 +734,18 @@
 	};
 };
 #endif
+
+&lpuart6 { /*  SER2 */
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_uart6>;
+	status = "okay";
+};
+
+&lpuart8 { /*  SER0 */
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_uart8>;
+	status = "okay";
+};
 
 &flexcan1 {
 	pinctrl-names = "default";
@@ -1169,12 +1188,35 @@
 		>;
 	};
 
+	pinctrl_uart2: uart2grp {
+		fsl,pins = <
+			MX93_PAD_UART2_RXD__LPUART2_RX			0x31e
+			MX93_PAD_UART2_TXD__LPUART2_TX			0x31e
+		>;
+	};
+
 	pinctrl_uart5: uart5grp {
 		fsl,pins = <
 			MX93_PAD_DAP_TDO_TRACESWO__LPUART5_TX	0x31e
 			MX93_PAD_DAP_TDI__LPUART5_RX		0x31e
 			MX93_PAD_DAP_TMS_SWDIO__LPUART5_RTS_B	0x31e
 			MX93_PAD_DAP_TCLK_SWCLK__LPUART5_CTS_B	0x31e
+		>;
+	};
+
+	pinctrl_uart6: uart6grp {
+		fsl,pins = <
+			MX93_PAD_GPIO_IO05__LPUART6_RX			0x31e
+			MX93_PAD_GPIO_IO04__LPUART6_TX			0x31e
+		>;
+	};
+
+	pinctrl_uart8: uart8grp {
+		fsl,pins = <
+			MX93_PAD_GPIO_IO13__LPUART8_RX			0x31e
+			MX93_PAD_GPIO_IO12__LPUART8_TX			0x31e
+			MX93_PAD_GPIO_IO14__LPUART8_CTS_B		0x31e
+			MX93_PAD_GPIO_IO15__LPUART8_RTS_B		0x31e
 		>;
 	};
 
