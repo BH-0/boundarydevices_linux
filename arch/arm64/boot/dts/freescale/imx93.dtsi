@@ -690,8 +690,8 @@
 				reg = <0x44310000 0x1000>;
 				clocks = <&clk IMX93_CLK_TPM1_GATE>;
 				assigned-clocks = <&clk IMX93_CLK_TPM1>;
-				assigned-clock-parents = <&clk IMX93_CLK_24M>;
-				assigned-clock-rates = <24000000>;
+				assigned-clock-parents = <&clk IMX93_CLK_BUS_AON>;
+				assigned-clock-rates = <40000000>;
 				#pwm-cells = <3>;
 				status = "disabled";
 			};
@@ -701,8 +701,8 @@
 				reg = <0x424e0000 0x1000>;
 				clocks = <&clk IMX93_CLK_TPM3_GATE>;
 				assigned-clocks = <&clk IMX93_CLK_TPM3>;
-				assigned-clock-parents = <&clk IMX93_CLK_24M>;
-				assigned-clock-rates = <24000000>;
+				assigned-clock-parents = <&clk IMX93_CLK_BUS_WAKEUP>;
+				assigned-clock-rates = <133333334>;
 				#pwm-cells = <3>;
 				status = "disabled";
 			};
