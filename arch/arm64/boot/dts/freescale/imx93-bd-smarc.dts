@@ -23,6 +23,8 @@
 	};
 
         aliases {
+		ethernet0 = &eqos;
+		ethernet1 = &fec;
 		rtc0 = &rv3028;
 		rtc1 = &bbnsm_rtc;
         };
